@@ -1,0 +1,15 @@
+{
+  "name": "m4m8_installer",
+  "version": "1.0.0",
+  "description": "installer for m4m8 N4M",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "amounra",
+  "license": "ISC",
+  "dependencies": {
+    "download-git-repo": ">=2.0.0",
+    "fs-extra": ">=8.1.0"
+  }
+}
