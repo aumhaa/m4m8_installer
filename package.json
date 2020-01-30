@@ -9,7 +9,7 @@
   "author": "amounra",
   "license": "ISC",
   "dependencies": {
-    "download-git-repo": ">=2.0.0",
-    "fs-extra": ">=8.1.0"
+    "fs-extra": ">=8.1.0",
+    "simple-git": ">=1.131.0"
   }
 }

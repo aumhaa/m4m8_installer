@@ -7,7 +7,8 @@ const { basename, join } = require("path");
 const { promisify } = require("util");
 const fs = require('fs');
 const { existsSync, lstat, mkdir, readdir, rmdir, unlink, rename, ensureDir, pathExists, copy, writeFile, move } = require("fs-extra");
-const github = require('download-git-repo');
+//const github = require('download-git-repo');
+const simpleGit = require('simple-git/promise');
 
 function arrayfromargs(){
 	return Array.prototype.slice.call(arguments, 0);
@@ -27,7 +28,7 @@ Debug = function(){
 const DEBUG = true;
 const debug = DEBUG&&Debug?Debug:function(){}
 
-const githubAsync = promisify(github);
+//const githubAsync = promisify(github);
 const execAsync = promisify(exec);
 const lstatAsync = promisify(lstat);
 const mkdirAsync = promisify(mkdir);
@@ -41,10 +42,10 @@ const copyAsync = promisify(copy);
 const writeFileAsync = promisify(writeFile);
 const moveAsync = promisify(move);
 
-const M4M8_URL = 'aumhaa/m4m8';
+const M4M8_URL = 'https://www.github.com/aumhaa/m4m8.git';
 const MOD_PACKAGE_DIR_NAME = '/m4m8';
 
-const OJI_URL = 'aumhaa/OJI';
+const OJI_URL = 'https://www.github.com/aumhaa/OJI.git';
 const OJI_PACKAGE_DIR_NAME = '/OJI';
 
 const DIRS_TO_BACKUP = ['m4m8', 'm4m8-master'];
@@ -80,7 +81,8 @@ maxApi.addHandler("update_paths", async () => {
 });
 
 const doDownload = (url, targetPath) => {
-	return githubAsync(url, targetPath)//, function (err) {debug(err ? 'Error' : 'Success')});
+	// return githubAsync(url, targetPath, {clone:true})//, function (err) {debug(err ? 'Error' : 'Success')});
+	return simpleGit().clone(url, targetPath);
 }
 
 const removeDir = async (dir) => {
@@ -122,6 +124,7 @@ const createBackupPath = (dir) => {
 	debug('date_backup:', new_dir);
 	return new_dir;
 }
+
 maxApi.addHandler("installPackage", async () => {
 	m4m8Path = join(pathsDict.boot.packagePath, MOD_PACKAGE_DIR_NAME);
 	debug('m4m8 path is:', m4m8Path);
@@ -130,7 +133,10 @@ maxApi.addHandler("installPackage", async () => {
 		for(var dir in DIRS_TO_BACKUP){
 			var path_to_backup = join(pathsDict.boot.packagePath, DIRS_TO_BACKUP[dir]);
 			if( (fs.existsSync(path_to_backup)) && (fs.lstatSync(path_to_backup).isDirectory()) ){
-				backupDir(path_to_backup, join(pathsDict.boot.maxPath, BACKUP_DEST));
+				let destination_path = join(pathsDict.boot.maxPath, BACKUP_DEST);
+				destination_path = createBackupPath(destination_path);
+				//debug('backing up:', destination_path)
+				backupDir(path_to_backup, destination_path);
 			}
 		}
 	}
@@ -146,6 +152,7 @@ maxApi.addHandler("installPackage", async () => {
 
 		await ensureDirAsync(pathsDict.boot.packagePath);
 
+		debug('doing download...');
 		await doDownload(M4M8_URL, m4m8Path);
 
 		debug("Success!");
@@ -177,7 +184,7 @@ maxApi.addHandler("installOJI", async () => {
 			if( (fs.existsSync(path_to_backup)) && (fs.lstatSync(path_to_backup).isDirectory()) ){
 				let destination_path = join(pathsDict.boot.maxPath, OJI_BACKUP_DEST);
 				destination_path = createBackupPath(destination_path);
-				debug('backing up:', destination_path)
+				//debug('backing up:', destination_path)
 				backupDir(path_to_backup, destination_path);
 			}
 		}
