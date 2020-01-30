@@ -5,21 +5,18 @@ const maxApi = require('max-api');
 const { exec } = require("child_process");
 const { basename, join } = require("path");
 const { promisify } = require("util");
-const { existsSync, lstat, mkdir, readdir, rmdir, unlink, rename, ensureDir, pathExists, copy, writeFile } = require("fs-extra");
+const fs = require('fs');
+const { existsSync, lstat, mkdir, readdir, rmdir, unlink, rename, ensureDir, pathExists, copy, writeFile, move } = require("fs-extra");
 const github = require('download-git-repo');
 
-function arrayfromargs()
-{
+function arrayfromargs(){
 	return Array.prototype.slice.call(arguments, 0);
 }
 
-Debug = function()
-{
+Debug = function(){
 	var args = arrayfromargs.apply(this, arguments);
-	for(var i in args)
-	{
-		if(args[i] instanceof Array)
-		{
+	for(var i in args){
+		if(args[i] instanceof Array){
 			args[i] = args[i].join(' ');
 		}
 	}
@@ -42,6 +39,7 @@ const ensureDirAsync = promisify(ensureDir);
 const pathExistsAsync = promisify(pathExists);
 const copyAsync = promisify(copy);
 const writeFileAsync = promisify(writeFile);
+const moveAsync = promisify(move);
 
 const M4M8_URL = 'aumhaa/m4m8';
 const MOD_PACKAGE_DIR_NAME = '/m4m8';
@@ -49,9 +47,24 @@ const MOD_PACKAGE_DIR_NAME = '/m4m8';
 const OJI_URL = 'aumhaa/OJI';
 const OJI_PACKAGE_DIR_NAME = '/OJI';
 
+const DIRS_TO_BACKUP = ['m4m8', 'm4m8-master'];
+const OJI_DIRS_TO_BACKUP = ['OJI', 'OJI-master'];
+
+const BACKUP_DEST = '/Packages (removed)/m4m8_backup_';
+const OJI_BACKUP_DEST = '/Packages (removed)/OJI_backup_';
+
 let inProgress = false;
 
 let pathsDict = undefined;
+
+let jwebDictId = "jweb_dict";
+try {
+  const jweb_dict = maxApi.getDict(jwebDictId);
+	//debug('library dict init handled');
+}
+catch (err) {
+	debug('jweb dict init error', err);
+}
 
 const update_paths = () => {
 	debug('update_paths');
@@ -65,7 +78,6 @@ const update_paths = () => {
 maxApi.addHandler("update_paths", async () => {
 	update_paths();
 });
-
 
 const doDownload = (url, targetPath) => {
 	return githubAsync(url, targetPath)//, function (err) {debug(err ? 'Error' : 'Success')});
@@ -94,10 +106,39 @@ const removeDir = async (dir) => {
 	await rmdirAsync(dir);
 };
 
-maxApi.addHandler("installPackage", async () => {
+const backupDir = async (dir_to_move, destination) => {
+	debug('backupDir', dir_to_move, destination)
+	if (!existsSync(dir_to_move)) return;
+	await moveAsync(dir_to_move, destination, {overwrite: true}, err => {
+		if (err) debug(err)
+	})
+}
 
+const createBackupPath = (dir) => {
+	//let date = (new Date()).toJSON().slice(0, 19).replace(/[-T]/g, '').replace(/[/]/g, '');
+	let date = new Date();
+	let timeStamp = ((date.getFullYear().toString()) + (date.getMonth().toString()) + (date.getDate().toString()) + (date.getHours().toString()) + (date.getMinutes().toString()) + (date.getSeconds().toString())).toString();
+	let new_dir = (dir+timeStamp).toString();
+	debug('date_backup:', new_dir);
+	return new_dir;
+}
+maxApi.addHandler("installPackage", async () => {
 	m4m8Path = join(pathsDict.boot.packagePath, MOD_PACKAGE_DIR_NAME);
 	debug('m4m8 path is:', m4m8Path);
+	try {
+		await ensureDirAsync(pathsDict.boot.packagePath);
+		for(var dir in DIRS_TO_BACKUP){
+			var path_to_backup = join(pathsDict.boot.packagePath, DIRS_TO_BACKUP[dir]);
+			if( (fs.existsSync(path_to_backup)) && (fs.lstatSync(path_to_backup).isDirectory()) ){
+				backupDir(path_to_backup, join(pathsDict.boot.maxPath, BACKUP_DEST));
+			}
+		}
+	}
+	catch (err) {
+		debug(err);
+		debug("Error", maxApi.POST_LEVELS.ERROR);
+		debug(err.message, maxApi.POST_LEVELS.ERROR);
+	}
 	try {
 		if (inProgress) throw new Error("m4m8 download is already in progress. Please wait.");
 
@@ -126,6 +167,26 @@ maxApi.addHandler("installOJI", async () => {
 
 	OJIPath = join(pathsDict.boot.packagePath, OJI_PACKAGE_DIR_NAME);
 	debug('OJIPath path is:', OJIPath);
+	for(var dir in OJI_DIRS_TO_BACKUP){
+		try {
+			await ensureDirAsync(pathsDict.boot.packagePath);
+			let path_to_backup = join(pathsDict.boot.packagePath, OJI_DIRS_TO_BACKUP[dir]);
+			debug('path_to_backup:', path_to_backup);
+			let exists = fs.existsSync(path_to_backup);
+			let isDir = fs.lstatSync(path_to_backup).isDirectory();
+			if( (fs.existsSync(path_to_backup)) && (fs.lstatSync(path_to_backup).isDirectory()) ){
+				let destination_path = join(pathsDict.boot.maxPath, OJI_BACKUP_DEST);
+				destination_path = createBackupPath(destination_path);
+				debug('backing up:', destination_path)
+				backupDir(path_to_backup, destination_path);
+			}
+		}
+		catch (err) {
+			debug(err);
+			// debug("Error", maxApi.POST_LEVELS.ERROR);
+			// debug(err.message, maxApi.POST_LEVELS.ERROR);
+		}
+	}
 	try {
 		if (inProgress) throw new Error("OJI download is already in progress. Please wait.");
 
@@ -154,8 +215,7 @@ maxApi.addHandler("install_python_scripts", async () => {
 
 	debug('install python scripts via node...');
 	let PythonPath = pathsDict.absolute.pythonPath;
-	if(PythonPath.endsWith('/'))
-	{
+	if(PythonPath.endsWith('/')){
 		PythonPath = PythonPath.replace(/\/$/, '');
 	}
 	PythonPath = PythonPath.split(':')[1];
@@ -166,14 +226,12 @@ maxApi.addHandler("install_python_scripts", async () => {
 	let user_livid_path = join(m4m8Path, 'Livid Python Scripts');
 	let user_python_path_exists = await pathExistsAsync(user_python_path);
 	let user_livid_path_exists = await pathExistsAsync(user_livid_path);
-	if((python_path_exists)&&(user_python_path_exists))
-	{
+	if((python_path_exists)&&(user_python_path_exists)){
 		debug('copying...');
 		await copy(user_python_path, PythonPath);
 	}
 	debug('Python Scripts finished copying.');
-	if((python_path_exists)&&(user_livid_path_exists))
-	{
+	if((python_path_exists)&&(user_livid_path_exists)){
 		debug('copying...');
 		await copy(user_livid_path, PythonPath);
 	}
@@ -184,8 +242,7 @@ maxApi.addHandler("install_OJI_Scripts", async () => {
 
 	debug('install OJI python scripts via node...');
 	let PythonPath = pathsDict.absolute.pythonPath;
-	if(PythonPath.endsWith('/'))
-	{
+	if(PythonPath.endsWith('/')){
 		PythonPath = PythonPath.replace(/\/$/, '');
 	}
 	PythonPath = PythonPath.split(':')[1];
@@ -194,14 +251,12 @@ maxApi.addHandler("install_OJI_Scripts", async () => {
 	//debug('PythonPath exists...');
 	let user_python_path = join(OJIPath, 'Python Scripts');
 	let user_python_path_exists = await pathExistsAsync(user_python_path);
-	if((python_path_exists)&&(user_python_path_exists))
-	{
+	if((python_path_exists)&&(user_python_path_exists)){
 		debug('copying...');
 		await copy(user_python_path, PythonPath);
 	}
 	debug('Python Scripts finished copying.');
 });
-
 
 maxApi.addHandler('write_log', async() => {
 	debug('write_log');
@@ -223,14 +278,12 @@ maxApi.addHandler('write_log', async() => {
 
 maxApi.post('starting script...');
 
-for(var i in pathsDict)
-{
-	debug('pathsDict', i);
-	for(var path in pathsDict[i])
-	{
-		path, pathsDict[i][path];
-	}
-}
+// for(var i in pathsDict){
+// 	debug('pathsDict', i);
+// 	for(var path in pathsDict[i]){
+// 		path, pathsDict[i][path];
+// 	}
+// }
 
 update_paths();
 

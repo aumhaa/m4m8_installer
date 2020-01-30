@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<script type="text/javascript">
+  var rendDict = {'status':'stopped', 'warnings':'none'};
+
+  var ret = function(dict){
+    rendDict = dict;
+  }
+
+  var msg_loading = function(){
+    window.max.outlet('loading...');
+  }
+
+  window.max.bindInlet('refreshDict', load_dict_vals);
+
+  // window.max.bindInlet('refreshDict', function(){
+  //   window.max.getDict("jweb_dict", ret);
+  //   for(var i in rendDict){
+  //     document.getElementById(i).innerHTML = rendDict[i];
+  //   }
+  // });
+
+  function load_dict_vals() {
+    window.max.getDict("jweb_dict", ret);
+    for(var i in rendDict){
+      document.getElementById(i).innerHTML = rendDict[i];
+      document.getElementById(i).style.color = ['running', 'none'].indexOf(rendDict[i]) > -1 ? 'green' : 'red';
+    }
+    msg_loading();
+  }
+</script>
+
+<style>
+  body {background-color: gray; line-height: 10px}
+  h3 {color: black;line-height: 10px;}
+  h4 {color: white;line-height: 10px;}
+  /* span {color: red;line-height: 10px;} */
+</style>
+
+<body onload="load_dict_vals();">
+  <h3 style="text-decoration:underline;"> m4m8 installer</h3>
+  <h4>Status <span id="status"></h4>
+    <!-- <span id="status"></span> -->
+  <h4>Warnings <span id="warnings"></span></h4>
+    <!-- <span id="warnings"></span> -->
+ </body>
+</html>

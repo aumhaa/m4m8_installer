@@ -1,4 +1,5 @@
 autowatch = 1;
+outlets = 2;
 
 var script = this;
 script._name = 'package_test';
@@ -24,8 +25,8 @@ Forceload = function(script){
 }
 
 var FORCELOAD = false;
-var DEBUG = true;
-var DEBUG_NODE = true;
+var DEBUG = false;
+var DEBUG_NODE = false;
 
 debug = DEBUG ? Debug : function(){};
 forceload = FORCELOAD ? Forceload : function(){};
@@ -36,6 +37,7 @@ var os = this.max.os;
 var liveApiApp;
 var live_version = false;
 var node_script;
+var nodescript_running;
 var jweb;
 var jweb_path;
 // var regexp = {pythoncheck:new RegExp(/(Directories: Python Remote Scripts: Check)/), python:new RegExp(/(Directories: Python Remote Scripts: )/)}
@@ -104,43 +106,86 @@ function init(){
 	oji_scripts_button.message('active', 0);
 	logs_button.message('active', 0);
 	node_script = this.patcher.getnamed('node_script');
-	//jweb = this.patcher.getnamed('jweb');
+	nodescript_running = this.patcher.getnamed('nodescript_running');
+	jweb_dict = new Dict('jweb_dict');
+	jweb = this.patcher.getnamed('jweb');
+	jweb.message('readfile', 'm4m8_installer.html');
+	refreshJweb();
+	node_debug = this.patcher.getnamed('node_debug');
+	DEBUG&&node_debug.front();
 	resolve_paths();
 	//DEBUG&&list_paths();
 	//jweb.message('read', conformedPaths.absolute.localFolderPath + '/webpage.html');
+	//node_script.message('script', 'npm', 'install');
+	initialize_nodescript();
+}
+
+function initialize_nodescript(){
+	var running = nodeIsRunning();
+	debug('nodeIsRunning', running);
 	node_script.message('script', 'npm', 'install');
+}
+
+function refreshJweb(){
+	//jweb.message('refreshDict');
+	outlet(1, 'refreshDict');
+	// jweb.message('reload');
+	//jweb.message('readfile', 'm4m8_installer.html');
+	debug('refreshJweb');
+	//jweb.message('rendermode', 1);
+	//jweb.message('rendermode', 0);
 }
 
 //collect all dump output from node.script, start node.script when npm install finishes.
 function nodeLog(){
 	var args = arrayfromargs(arguments);
 	var keys = statusDict.getkeys();
-	debug('keys:', keys);
-	if(DEBUG_NODE){
-		debug('NODE:', args);
-		for(var i in keys){
-			var item = statusDict.get(keys[i]);
-			if(typeof(item)=='object'){
-				for(var j in item){
-					debug('NODE:', keys[i], j, ':', item[j]);
-				}
-			}
-			else{
-				debug('NODE:', keys[i], ':', item);
-			}
-		}
-	}
+	//debug('keys:', keys);
+	// if(DEBUG_NODE){
+	// 	debug('NODE:', args);
+	// 	for(var i in keys){
+	// 		var item = statusDict.get(keys[i]);
+	// 		if(typeof(item)=='object'){
+	// 			for(var j in item){
+	// 				debug('NODE:', keys[i], j, ':', item[j]);
+	// 			}
+	// 		}
+	// 		else{
+	// 			debug('NODE:', keys[i], ':', item);
+	// 		}
+	// 	}
+	// }
 	//debug('args in keys:', 'args' in keys);
 	//debug('status in keys:', 'status' in keys);
-	if((args[0] == 'npm')&&(args[1] == 'success')&&(statusDict.get('args')[0] == 'install')&&(statusDict.get('status') == 'completed')){
-		debug('starting script');
-		//outlet(0, 'script', 'start');
-		node_script.message('script', 'start');
+	// if((args[0] == 'npm')&&(args[1] == 'success')&&(statusDict.get('args')[0] == 'install')&&(statusDict.get('status') == 'completed')){
+	// 	debug('starting script');
+	// 	//outlet(0, 'script', 'start');
+	// 	node_script.message('script', 'start');
+	// }
+	var status = dict_to_jsobj(statusDict);
+	//debug('statusDict:', status);
+	for(var i in status){
+		debug('NODE status.'+i, status[i]);
+	}
+	if(('args' in status)&&(status.args[0]=='install'))
+	{
+		if(status.status=='started'){
+			jweb_dict.set('status', 'node modules installing');
+			refreshJweb();
+		}
+		if(status.status=='completed'){
+			// jweb_dict.set('status', 'node script starting');
+			// refreshJweb();
+			node_script.message('script', 'start');
+		}
 	}
 }
 
 //received when node.script starts
 function node_script_started(){
+	debug('running');
+	jweb_dict.set('status', 'running');
+	refreshJweb();
 	node_script.message('update_paths');
 	package_button.message('active', 1);
 	oji_package_button.message('active', 1);
@@ -149,6 +194,7 @@ function node_script_started(){
 
 //resolve all used paths and store in dict for access across max
 function resolve_paths(){
+	getConformedPath('maxPath', 'Usermax');
 	getConformedPath('userPath', 'Usermax');
 	getConformedPath('userPath', conformedPaths.boot.userPath.replace('/Documents/Max 8/', ''));
 	detect_live_preferences_path(conformedPaths.absolute.userPath);
@@ -235,6 +281,7 @@ function read_live_log(path){
 		var a = line.split('info: ');
 		if(regexp.docscheck.test(a[1])==1){
 			//debug('checking...');
+			//this buffer is getting overrun, need to do smaller chunk?
 			line = log_file.readline(200);
 			var b = line.split('info:');
 			if(regexp.docs.test(b[1])==1){
@@ -299,4 +346,35 @@ function package_installed(){
 function oji_package_installed(){
 	oji_scripts_button.message('active', 1);
 }
+
+
 forceload(this);
+
+
+function dict_to_jsobj(dict) {
+	if (dict == null) return null;
+	var o = new Object();
+	var keys = dict.getkeys();
+	if (keys == null || keys.length == 0) return null;
+
+	if (keys instanceof Array) {
+		for (var i = 0; i < keys.length; i++)
+		{
+			var value = dict.get(keys[i]);
+
+			if (value && value instanceof Dict) {
+				value = dict_to_jsobj(value);
+			}
+			o[keys[i]] = value;
+		}
+	} else {
+		var value = dict.get(keys);
+
+		if (value && value instanceof Dict) {
+			value = dict_to_jsobj(value);
+		}
+		o[keys] = value;
+	}
+
+	return o;
+}
