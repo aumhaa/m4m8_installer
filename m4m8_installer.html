@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html>
 <script type="text/javascript">
-  var rendDict = {'status':'stopped', 'warnings':'none'};
+  var rendDict = {'status':'stopped', 'warnings':'none', 'log':''};
 
   var ret = function(dict){
     rendDict = dict;
   }
 
   var msg_loading = function(){
-    window.max.outlet('loading...');
+    //window.max.outlet('loading...');
   }
 
   window.max.bindInlet('refreshDict', load_dict_vals);
@@ -24,24 +24,29 @@
     window.max.getDict("jweb_dict", ret);
     for(var i in rendDict){
       document.getElementById(i).innerHTML = rendDict[i];
-      document.getElementById(i).style.color = ['running', 'none'].indexOf(rendDict[i]) > -1 ? 'green' : 'red';
+      if(['status', 'warnings'].indexOf(i) > -1){
+        document.getElementById(i).style.color = ['running', 'none'].indexOf(rendDict[i]) > -1 ? 'green' : 'red';
+      }
+      else {
+        document.getElementById(i).style.color = 'black';
+      }
     }
     msg_loading();
   }
 </script>
 
 <style>
-  body {background-color: gray; line-height: 10px}
-  h3 {color: black;line-height: 10px;}
-  h4 {color: white;line-height: 10px;}
-  /* span {color: red;line-height: 10px;} */
+  body {background-color: lightgray; line-height: 10px}
+  h3 {color: black;line-height: 5px;text-align:center;}
+  h5 {color: black;line-height: 2px;}
+  h6 {color: black;line-height: 2px;}
+  p {color: black;line-height: 2px;font-size:80%}
 </style>
 
 <body onload="load_dict_vals();">
   <h3 style="text-decoration:underline;"> m4m8 installer</h3>
-  <h4>Status <span id="status"></h4>
-    <!-- <span id="status"></span> -->
-  <h4>Warnings <span id="warnings"></span></h4>
-    <!-- <span id="warnings"></span> -->
+  <h5>Node Status:   <span id="status"></span></h4>
+  <h5>Warnings:   <span id="warnings"></span></h4>
+  <p>Log:   <span id="log"></span></p>
  </body>
 </html>

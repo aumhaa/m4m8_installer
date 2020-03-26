@@ -83,7 +83,11 @@ for(var type in conformedPaths){
 //a check to make sure node.script is actually running before we send messages to it
 function nodeIsRunning(){
 	//var node = this.patcher.getnamed('node_script');
-	return this.patcher.getnamed('node_script').getattr('running') ? true : false;
+	var running = this.patcher.getnamed('node_script').getattr('running') ? true : false;
+	debug('nodeIsRunning:', running);
+	jweb_dict.set('status', running ? 'running' : 'stopped');
+	jwebRefreshTask.schedule(3000);
+	return running;
 }
 
 //catch non-handled requests
@@ -97,20 +101,28 @@ function init(){
 	alive = true;
 	package_button = this.patcher.getnamed('package_button');
 	scripts_button = this.patcher.getnamed('scripts_button');
+	m4m8_node_button = this.patcher.getnamed('m4m8_node_button');
 	logs_button = this.patcher.getnamed('logs_button');
 	oji_package_button = this.patcher.getnamed('oji_package_button');
 	oji_scripts_button = this.patcher.getnamed('oji_scripts_button');
+	oji_node_button = this.patcher.getnamed('oji_node_button');
 	package_button.message('active', 0);
 	scripts_button.message('active', 0);
+	m4m8_node_button.message('active', 0);
 	oji_package_button.message('active', 0);
 	oji_scripts_button.message('active', 0);
+	oji_node_button.message('active', 0);
 	logs_button.message('active', 0);
 	node_script = this.patcher.getnamed('node_script');
 	nodescript_running = this.patcher.getnamed('nodescript_running');
 	jweb_dict = new Dict('jweb_dict');
 	jweb = this.patcher.getnamed('jweb');
 	jweb.message('readfile', 'm4m8_installer.html');
-	refreshJweb();
+	//refreshJweb();
+	jwebRefreshTask = new Task(refreshJweb, this);
+	//jwebRefreshTask.interval = 1000;
+	jwebRefreshTask.schedule(3000);
+	// jwebRefreshTask.repeat(5)
 	node_debug = this.patcher.getnamed('node_debug');
 	DEBUG&&node_debug.front();
 	resolve_paths();
@@ -118,12 +130,14 @@ function init(){
 	//jweb.message('read', conformedPaths.absolute.localFolderPath + '/webpage.html');
 	//node_script.message('script', 'npm', 'install');
 	initialize_nodescript();
+
 }
 
 function initialize_nodescript(){
 	var running = nodeIsRunning();
 	debug('nodeIsRunning', running);
-	node_script.message('script', 'npm', 'install');
+	// node_script.message('script', 'npm', 'install');
+	node_script.message('script', 'start');
 }
 
 function refreshJweb(){
@@ -184,8 +198,9 @@ function nodeLog(){
 //received when node.script starts
 function node_script_started(){
 	debug('running');
-	jweb_dict.set('status', 'running');
-	refreshJweb();
+	//jweb_dict.set('status', 'running');
+	//refreshJweb();
+	nodeIsRunning();
 	node_script.message('update_paths');
 	package_button.message('active', 1);
 	oji_package_button.message('active', 1);
@@ -340,13 +355,27 @@ function returnConformedPath(type, path_boot, path_absolute){
 }
 
 function package_installed(){
+	install_m4m8_node_dependencies();
+	m4m8_node_button.message('active', 1);
 	scripts_button.message('active', 1);
 }
 
 function oji_package_installed(){
+	install_OJI_node_dependencies();
+	oji_node_button.message('active', 1);
 	oji_scripts_button.message('active', 1);
 }
 
+
+function install_m4m8_node_dependencies(){
+	script.m4m8_node_installer = this.patcher.newdefault(450, 489, 'node.script', 'm4m8_node_installer.js');
+	m4m8_node_installer.message('script', 'npm', 'install');
+}
+
+function install_OJI_node_dependencies(){
+	script.OJI_node_installer = this.patcher.newdefault(508, 489, 'node.script', 'OJI_node_installer.js');
+	OJI_node_installer.message('script', 'npm', 'install');
+}
 
 forceload(this);
 
