@@ -373,7 +373,7 @@ function install_m4m8_node_dependencies(){
 }
 
 function install_OJI_node_dependencies(){
-	script.OJI_node_installer = this.patcher.newdefault(508, 489, 'node.script', 'OJI_node_installer.js');
+	script.OJI_node_installer = this.patcher.newdefault(508, 489, 'node.script', '~/Documents/Max 8/packages/OJI/javascript/node_dependencies/OJI_node_installer.js');
 	OJI_node_installer.message('script', 'npm', 'install');
 }
 
